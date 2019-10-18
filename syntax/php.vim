@@ -608,9 +608,15 @@ syn case ignore
   syn match phpOperator contained display /::\@!/
 
   syn cluster phpClExpressions add=phpTernaryRegion
-  syn region phpTernaryRegion matchgroup=phpOperator start=/?/ end=/::\@!/
+  syn region phpTernaryRegion matchgroup=phpOperator start=/??\@!/ end=/::\@!/
         \ transparent keepend extend display
         \ contained matchgroup=Error end=/[;)\]}]/
+
+  " different highlighting for null-coalesce '??' operator
+  syn cluster phpClExpressions add=phpSpecialOperator
+  syn match   phpSpecialOperator contained display /??/
+  hi! link phpSpecialOperator SpecialChar
+
 
 
 " PHP syntax: null/true/false/numbers {{{1
