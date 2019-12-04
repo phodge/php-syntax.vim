@@ -1066,6 +1066,20 @@ syn case ignore
 
 " PHP Syntax: statements: {{{1
 
+  " 'namespace XXX;' declaration
+  syn cluster phpClCode add=phpNamespaceTopRegion
+  syn region phpNamespaceTopRegion matchgroup=phpNamespace start=/^\s*\<namespace\>/ end=/;/ contained keepend extend
+        \ matchgroup=Error end=/[})\]]/
+        \ contains=@phpClStructures
+  hi! link phpNamespace Function
+
+  " 'use xxx;' statements
+  syn cluster phpClCode add=phpUseRegion
+  syn region phpUseRegion matchgroup=phpUse start=/\<use\>/ end=/;/ contained keepend extend
+        \ matchgroup=Error end=/[,})\]]/
+        \ contains=@phpClStructures
+  hi! link phpUse Macro
+
   " if we are not using smart semicolons, we can implement these using
   " keywords
   if ! s:smart_semicolon
