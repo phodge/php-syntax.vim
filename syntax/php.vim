@@ -546,9 +546,9 @@ syn case ignore
 
   " also, some very basic matches for these place-holders
   syn match phpStructureHere /\h\w*/ contained display
-  syn match phpMemberHere /\h\w*/ contained display
+  syn match phpMemberHere /\h\w*/ contained display nextgroup=@phpClPostExpr
   syn match phpMethodHere /\h\w*/ contained display
-  syn match phpPropertyHere /\h\w*/ contained display
+  syn match phpPropertyHere /\h\w*/ contained nextgroup=@phpClPostExpr
 
   " we also need a match that works for names containing namespaces
   syn cluster phpClStructures add=phpNamespacedName
@@ -824,6 +824,7 @@ syn case ignore
   syn cluster phpClPropertyHere add=phpPropertyInString
   syn match phpPropertyInString /->\h\w*/ contained display extend
         \ contains=phpPropertySelector,@phpClProperties
+        \ nextgroup=@phpClPostExpr
 
   " it's sometimes easy to get it wrong
   syn match phpPropertyInStringError contained display /->\%([^a-z0-9_"\\]\|\\.\)/
@@ -866,10 +867,12 @@ syn case ignore
   syn cluster phpClExpressions add=phpIdentifier
   syn match phpIdentifier /\$\h\w*/ contained display
         \ contains=phpVarSelector,@phpClIdentifier
+        \ nextgroup=@phpClPostExpr skipwhite
 
   " match a dereference-variable ($$variable)
   syn match phpIdentifier /\$\$\+\h\w*/ contained display
         \ contains=@phpClIdentifier,phpVarSelectorDeref,phpVarSelectorError,phpDerefInvalid
+        \ nextgroup=@phpClPostExpr skipwhite
 
   " you can't dereference these variables:
   syn match phpDerefInvalid contained display
@@ -1879,11 +1882,25 @@ if s:alt_arrays
           \ keepend extend contains=@phpClExpressions,phpArrayPair,phpArrayComma
           \ matchgroup=Error end=/;/
           \ fold
+    syn region phpArrayRegionSimple contained matchgroup=phpArrayParens start=/\[/ end=/\]/
+          \ keepend extend contains=@phpClValues,phpArrayPair,phpArrayComma
+          \ matchgroup=Error end=/;/
+          \ fold
+    syn region phpArrayRegion contained matchgroup=phpArrayParens start=/\[/ end=/\]/
+          \ keepend extend contains=@phpClExpressions,phpArrayPair,phpArrayComma
+          \ matchgroup=Error end=/;/
+          \ fold
   else
     syn region phpArrayRegionSimple contained matchgroup=phpArrayParens start=/\<array\_s*(/ end=/)/
           \ keepend extend contains=@phpClValues,phpArrayPair,phpArrayComma
           \ matchgroup=Error end=/;/
     syn region phpArrayRegion contained matchgroup=phpArrayParens start=/\<array\_s*(/ end=/)/
+          \ keepend extend contains=@phpClExpressions,phpArrayPair,phpArrayComma
+          \ matchgroup=Error end=/;/
+    syn region phpArrayRegionSimple contained matchgroup=phpArrayParens start=/\[/ end=/\]/
+          \ keepend extend contains=@phpClValues,phpArrayPair,phpArrayComma
+          \ matchgroup=Error end=/;/
+    syn region phpArrayRegion contained matchgroup=phpArrayParens start=/\[/ end=/\]/
           \ keepend extend contains=@phpClExpressions,phpArrayPair,phpArrayComma
           \ matchgroup=Error end=/;/
   endif
@@ -1946,7 +1963,7 @@ syn match phpPropertySelector contained display /->/
 if ! s:smart_members
   " NOTE: this match is for ANY '->' match, however the more specific
   " phpPropertySelector or phpDynamicSelector may match instead
-  syn cluster phpClExpressions add=phpMemberSelector
+  syn cluster phpClPostExpr add=phpMemberSelector
   syn match phpMemberSelector contained display /->/
         \ nextgroup=@phpClProperties,@phpClMembers,phpMemberHere skipwhite skipempty
 
@@ -1996,7 +2013,7 @@ syn region phpIdentifierComplex contained display matchgroup=phpVarSelector star
 " Define
 syn cluster phpClExpressions add=phpObjectOperator
 syn keyword	phpObjectOperator contained new
-      \ nextgroup=@phpClClasses,@phpClInterfaces,phpStructureHere skipwhite skipempty
+      \ nextgroup=@phpClStructures,phpStructureHere skipwhite skipempty
 syn keyword	phpObjectOperator contained clone
 
 " Todo
@@ -2071,7 +2088,7 @@ if s:strict_blocks
   endif
 
   " match up ( and ), as well as [ and ]
-  syn cluster phpClExpressions add=phpParentRegion,phpBracketRegion
+  syn cluster phpClExpressions add=phpParentRegion
   syn region phpParentRegion contained keepend extend contains=@phpClExpressions
         \ matchgroup=phpParent start=/(/ end=/)/
         \ matchgroup=Error end=/;/ end=/}/ end=/\]/
@@ -2079,10 +2096,6 @@ if s:strict_blocks
   " normally only one line
   " TODO: does the 'display' option break folding for php_fold_arrays? The
   " answer is YES
-  syn region phpBracketRegion contained keepend extend contains=@phpClExpressions
-        \ matchgroup=phpParent start=/\[/ end=/\]/
-        \ matchgroup=Error end=/;/
-
   " when a closing }, ) or ] is out of place ...
   if s:parent_error_close
     syn cluster phpClValues add=phpBraceError,phpParentError
@@ -2325,18 +2338,26 @@ if s:strict_blocks
   " IV MATCH: function & somefunc<(>$a = 0, &$b<)> { }: {{{3
   " match the parenthesis surrounding the function arguments
   if s:folding
-    syn region phpDefineFuncProto contained contains=@phpClDefineFuncProtoArgs
+    syn region phpDefineFuncProto contained contains=@phpClDefineFuncProtoArgs,@phpClThingType
           \ matchgroup=phpParent start=/(/ end=/)/ keepend extend
-          \ nextgroup=@phpClDefineFuncBlock
+          \ nextgroup=@phpClDefineFuncBlock,phpDefineFuncReturnTypeRegion
           \ skipwhite skipempty
           \ fold
   else
-    syn region phpDefineFuncProto contained contains=@phpClDefineFuncProtoArgs
+    syn region phpDefineFuncProto contained contains=@phpClDefineFuncProtoArgs,@phpClThingType
           \ matchgroup=phpParent start=/(/ end=/)/ keepend extend
-          \ nextgroup=@phpClDefineFuncBlock
+          \ nextgroup=@phpClDefineFuncBlock,phpDefineFuncReturnTypeRegion
           \ skipwhite skipempty
   endif
   " TODO: allow comments in this cluster
+
+  syn region phpDefineFuncReturnTypeRegion matchgroup=phpDefineMethod start=/:/ end=/\ze{/ keepend extend
+        \ contains=@phpClThingType
+        \ nextgroup=@phpClDefineFuncBlock
+
+  syn cluster phpClThingType add=phpThingType
+  syn keyword phpThingType contained array int string bool
+  hi! link phpThingType phpType
 
 
   " V MATCH: function & somefunc(<stdClass> $a = 0, &$b) { }: {{{3
@@ -2377,6 +2398,8 @@ if s:strict_blocks
     if s:alt_arrays
       syn cluster phpClProtoValues add=phpProtoArray
       syn region phpProtoArray matchgroup=phpArrayParens start=/\<array\_s*(/ end=/)/ keepend extend
+          \ contained contains=@phpClProtoValues,phpArrayPair
+      syn region phpProtoArray matchgroup=phpArrayParens start=/\[/ end=/\]/ keepend extend
           \ contained contains=@phpClProtoValues,phpArrayPair
 
       " don't allow arbitrary parenthesis here!!
@@ -2776,6 +2799,14 @@ syn match phpAssignByRef /&\$\@=/	contained display
 " highlighting for the '@' error-supressing operator
 syn cluster phpClExpressions add=phpSupressErrors
 syn match phpSupressErrors /@/ contained display
+
+" XXX: note that we need to put this further down the script as it needs to
+" take higher priority. Sorry :-/
+syn cluster phpClPostExpr add=phpBracketRegion
+syn region phpBracketRegion contained keepend extend contains=@phpClExpressions
+      \ matchgroup=phpParent start=/\[/ end=/\]/
+      \ matchgroup=Error end=/;/
+
 
 " ================================================================
 
