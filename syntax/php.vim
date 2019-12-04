@@ -550,6 +550,12 @@ syn case ignore
   syn match phpMethodHere /\h\w*/ contained display
   syn match phpPropertyHere /\h\w*/ contained display
 
+  " we also need a match that works for names containing namespaces
+  syn cluster phpClStructures add=phpNamespacedName
+  syn match phpNamespacedName contained /\%(\\\h\w*\)\+\>/ contains=phpStructureHere keepend extend
+  syn match phpNamespacedName contained /\%(\h\w*\\\)\+\h\w*\>/ contains=phpStructureHere keepend extend
+  hi! link phpNamespacedName Function
+
   " what to include at the top level?
   if ! s:strict_blocks
     " if not strict blocks, we must also allow matching of things from inside
